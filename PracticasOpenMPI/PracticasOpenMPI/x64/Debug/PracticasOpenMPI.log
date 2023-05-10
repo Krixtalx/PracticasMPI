@@ -1,2 +1,4 @@
 ﻿  Main.cpp
+C:\Github\PracticasMPI\PracticasOpenMPI\PracticasOpenMPI\Main.cpp(194,17): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
+C:\Github\PracticasMPI\PracticasOpenMPI\PracticasOpenMPI\Main.cpp(231,40): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
   PracticasOpenMPI.vcxproj -> C:\Github\PracticasMPI\PracticasOpenMPI\x64\Debug\PracticasOpenMPI.exe

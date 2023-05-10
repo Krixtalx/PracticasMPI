@@ -1,4 +1,4 @@
-#include<mpi.h> 
+#include <mpi.h> 
 #include <iostream>
 #include <thread>
 #include <chrono> 
@@ -82,19 +82,36 @@ void Pr3(int argc, char* argv[]) {
 	for (size_t i = 0; i < _numProcs; i++) {
 		_buffer[i] = 0;
 	}
+
 	//Todos los procesos envian sus resultados al proceso 0, quien realizará la agregación.
 	MPI_Gather(&_q, 1, MPI_DOUBLE, _buffer, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 	//Se agregan los resultados de cada uno de los procesos y se obtiene el resultado final. 
 	if (_processId == 0) {
-		_q=0;
+		_q = 0;
 		for (size_t i = 0; i < _numProcs; i++) {
-			_q+=_buffer[i];
+			_q += _buffer[i];
 		}
-		_q*=4/(double)_numProcs;
-		std::cout<<"Aproximación de Pi: "<<_q<<std::endl;
+		_q *= 4 / (double)_numProcs;
+		std::cout << "Aproximación de Pi: " << _q << std::endl;
 	}
 
+	MPI_Finalize(); //Finalización OpenMPI
+}
+
+void Pr4(int argc, char* argv[]) {
+	int _processId, _numProcs;
+	int n = 0;
+
+	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+
+	MPI_Reduce(&_processId, &n, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+	std::cout << "Soy el proceso " << _processId << " y recibo la suma " << n;
+
+	std::cout << std::endl;
 	MPI_Finalize(); //Finalización OpenMPI
 }
 
@@ -165,8 +182,121 @@ void EjercicioGather(int argc, char* argv[]) {
 	MPI_Finalize(); //Finalización OpenMPI
 }
 
+void EjercicioScatter(int argc, char* argv[]) {
+	int _processId, _numProcs;
+	int n = 0;
+
+	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+	int* _buffer = new int[_numProcs];
+	for (size_t i = 0; i < _numProcs; i++) {
+		_buffer[i] = i;
+	}
+	MPI_Scatter(_buffer, 1, MPI_INT, &n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+	std::cout << "Soy el proceso " << _processId << " y recibo " << n;
+
+	std::cout << std::endl;
+	delete[] _buffer;
+	MPI_Finalize(); //Finalización OpenMPI
+}
+
+void EjercicioReduce(int argc, char* argv[]) {
+	int _processId, _numProcs;
+	int n = 0;
+
+	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+
+	MPI_Reduce(&_processId, &n, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+	std::cout << "Soy el proceso " << _processId << " y recibo la suma " << n;
+
+	std::cout << std::endl;
+	MPI_Finalize(); //Finalización OpenMPI
+}
+
+void EjercicioAllGatherAlltoall(int argc, char* argv[]) {
+	int _processId, _numProcs;
+	int n = 0;
+
+	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+	int* _bufferEnvio = new int[_numProcs];
+	int* _bufferRecepcion = new int[_numProcs * _numProcs];
+	for (size_t i = 0; i < _numProcs; i++) {
+		_bufferEnvio[i] = i + 10 * _processId;
+	}
+	MPI_Allgather(_bufferEnvio, _numProcs, MPI_INT, _bufferRecepcion, _numProcs, MPI_INT, MPI_COMM_WORLD);
+
+	std::cout << "Soy el proceso " << _processId << " y he recibido ";
+	for (size_t i = 0; i < _numProcs * _numProcs; i++) {
+		std::cout << _bufferRecepcion[i] << ", ";
+	}
+	std::cout << std::endl;
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	MPI_Alltoall(_bufferEnvio, 1, MPI_INT, _bufferRecepcion, 1, MPI_INT, MPI_COMM_WORLD);
+
+	std::cout << "Soy el proceso " << _processId << " y he recibido ";
+	for (size_t i = 0; i < _numProcs; i++) {
+		std::cout << _bufferRecepcion[i] << ", ";
+	}
+
+	std::cout << std::endl;
+	delete[] _bufferEnvio;
+	delete[] _bufferRecepcion;
+	MPI_Finalize(); //Finalización OpenMPI
+}
+
+void EjercicioScan(int argc, char* argv[]) {
+	int _processId, _numProcs;
+	int n = 0;
+
+	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+
+	MPI_Scan(&_processId, &n, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+	std::cout << "Soy el proceso " << _processId << " y recibo la suma " << n;
+
+	std::cout << std::endl;
+	MPI_Finalize(); //Finalización OpenMPI
+}
+
+void customOp(int* inVec, int* inOutVec, int* len, MPI_Datatype* dtype) {
+	for (size_t i = 0; i < *len; i++) {
+		inOutVec[i] = inOutVec[i] * 10 + inVec[i];
+	}
+}
+
+void EjercicioOperacionCustom(int argc, char* argv[]) {
+	int _processId, _numProcs;
+	int n = 0;
+
+	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+	MPI_Op myOp;
+	MPI_Op_create((MPI_User_function*)customOp, false, &myOp);
+
+	MPI_Reduce(&_processId, &n, 1, MPI_INT, myOp, 0, MPI_COMM_WORLD);
+
+	if (_processId == 0)
+		std::cout << "Soy el proceso " << _processId << " y he recibido en el reparto " << n << std::endl;
+
+	MPI_Op_free(&myOp);
+
+	MPI_Finalize(); //Finalización OpenMPI
+}
+
 int main(int argc, char* argv[]) {
-	Pr3(argc, argv);
+	EjercicioOperacionCustom(argc, argv);
 
 	return 0;
 }
