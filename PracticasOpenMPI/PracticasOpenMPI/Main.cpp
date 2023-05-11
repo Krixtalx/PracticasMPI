@@ -101,17 +101,44 @@ void Pr3(int argc, char* argv[]) {
 
 void Pr4(int argc, char* argv[]) {
 	int _processId, _numProcs;
-	int n = 0;
-
+	const int _numDatos = 100000; //Número de datos total a repartir entre todos los procesos.
 	MPI_Init(&argc, &argv); //Inicialización OpenMPI
 	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
 	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
 
-	MPI_Reduce(&_processId, &n, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+	const int fixedValue = _numDatos + _numDatos % _numProcs; //Ajustamos el nº de valores en función al nº de procesos, de manera que todos los procesos reciban la misma cantidad de datos, aunque unos pocos sean nulos.
+	const int dataPerProcess = fixedValue / _numProcs; //Calculamos cuantos datos se le envia a cada proceso.
+	int* _partialBuffer = new int[dataPerProcess]; //Reservamos memoria en cada proceso para recibir los datos enviados por _processId==0.
 
-	std::cout << "Soy el proceso " << _processId << " y recibo la suma " << n;
+	if (_processId == 0) {
+		int* _buffer = new int[fixedValue];
+		for (int i = 0; i < _numDatos; i++) {
+			_buffer[i] = i; //Rellenamos el buffer de valores a enviar de manera secuencial. De esta manera sabemos que el valor final deberá de ser _numDatos-1
+		}
+		for (int i = _numDatos; i < fixedValue; i++) {
+			_buffer[i] = INT32_MIN; //Se añaden los valores "nulos" al final del buffer. El valor nulo dependerá de la operación utilizada. En este caso es el valor MIN de int32. En caso de que la operación fuera suma, el nulo sería 0. 
+		}
+		MPI_Scatter(_buffer, dataPerProcess, MPI_INT, _partialBuffer, dataPerProcess, MPI_INT, 0, MPI_COMM_WORLD); //Repartimos los datos entre todos los procesos.
+		delete[] _buffer;
+	} else {
+		MPI_Scatter(nullptr, 0, MPI_INT, _partialBuffer, dataPerProcess, MPI_INT, 0, MPI_COMM_WORLD); //Recibimos los datos en los procesos "trabajadores"
+	}
+	int _currentMax = INT32_MIN;
+	for (int i = 0; i < dataPerProcess; i++) { //Calculamos el máximo del subconjunto de datos de este proceso. 
+		if (_currentMax < _partialBuffer[i])
+			_currentMax = _partialBuffer[i];
+	}
+	std::cout << "Soy el proceso " << _processId << " y mi maximo es " << _currentMax << std::endl;
 
-	std::cout << std::endl;
+	int _finalMax = 0;
+	MPI_Reduce(&_currentMax, &_finalMax, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD); //Enviamos los resultados obtenidos al proceso principal, quien realizará la reducción final. 
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	if (_processId == 0)
+		std::cout << "Soy el proceso " << _processId << " y el maximo final es " << _finalMax << std::endl;
+
+	delete[] _partialBuffer;
 	MPI_Finalize(); //Finalización OpenMPI
 }
 
@@ -296,7 +323,7 @@ void EjercicioOperacionCustom(int argc, char* argv[]) {
 }
 
 int main(int argc, char* argv[]) {
-	EjercicioOperacionCustom(argc, argv);
+	Pr4(argc, argv);
 
 	return 0;
 }
