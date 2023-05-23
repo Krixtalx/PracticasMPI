@@ -200,7 +200,7 @@ void EjercicioTypeVector(int argc, char* argv[]) {
 		for (int i = 0; i < 18; i++) {
 			sendData[i] = i;
 		}
-		for (int i = 0; i < _numProcs-1; i++) {
+		for (int i = 0; i < _numProcs - 1; i++) {
 			std::cout << "Enviado al proceso " << i + 1 << " desde " << sendData[i * 2] << std::endl;
 			MPI_Send(&sendData[i * 2], 1, tvector, i + 1, 0, MPI_COMM_WORLD);
 		}
@@ -244,11 +244,72 @@ void EjercicioTerna(int argc, char* argv[]) {
 		for (int i = 0; i < 18; i++) {
 			bufferRecv[i] = -1;
 		}
-		MPI_Recv(bufferRecv, 18, MPI_INT, 0,0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		MPI_Recv(bufferRecv, 18, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		for (int i = 0; i < 18; i++) {
-			std::cout<<bufferRecv[i]<<", ";
+			std::cout << bufferRecv[i] << ", ";
 		}
-		std::cout<<std::endl;
+		std::cout << std::endl;
+	}
+
+	MPI_Finalize(); //Finalización OpenMPI
+}
+
+void EjercicioComunicadores(int argc, char* argv[]) {
+	int _processId, _numProcs;
+	int n = -1;
+	int newRanks[] = { 0, 2, 4, 6 };
+
+	MPI_Group origGroup, newGroup;
+	MPI_Comm newComm;
+
+	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+
+	if (_processId == 0)
+		n = _numProcs;
+
+	MPI_Comm_group(MPI_COMM_WORLD, &origGroup);
+	MPI_Group_incl(origGroup, 4, newRanks, &newGroup);
+	MPI_Comm_create(MPI_COMM_WORLD, newGroup, &newComm);
+	int newRank = -1;
+	if (_processId % 2 == 0)
+		MPI_Comm_rank(newComm, &newRank);
+	if (newRank >= 0) {
+		MPI_Bcast(&n, 1, MPI_INT, 0, newComm);
+		std::cout << "Soy el proceso " << _processId << " con nuevo rank " << newRank << " y recibo " << n << std::endl;
+	}
+
+	MPI_Finalize(); //Finalización OpenMPI
+}
+
+void EjercicioGrupoErrores(int argc, char* argv[]) {
+	int _processId, _numProcs;
+	int n = -1;
+	int newRanks[] = { 0, 2, 4, 6 };
+
+	MPI_Group origGroup, newGroup;
+	MPI_Comm newComm;
+
+	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+	MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+
+	if (_processId == 0)
+		n = _numProcs;
+
+	MPI_Comm_group(MPI_COMM_WORLD, &origGroup);
+	MPI_Group_incl(origGroup, 4, newRanks, &newGroup);
+	MPI_Comm_create(MPI_COMM_WORLD, newGroup, &newComm);
+
+	int newRank = -1;
+	int errorCode = MPI_Comm_rank(newComm, &newRank);
+	if (errorCode == MPI_SUCCESS) {
+		MPI_Bcast(&n, 1, MPI_INT, 0, newComm);
+		std::cout << "Soy el proceso " << _processId << " con nuevo rank " << newRank << " y recibo " << n << std::endl;
+	}else{
+		std::cout << "Soy el proceso " << _processId << " y no he podido obtener un nuevo rango" << std::endl;
 	}
 
 	MPI_Finalize(); //Finalización OpenMPI

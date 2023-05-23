@@ -146,7 +146,7 @@ void Pr4(int argc, char* argv[]) {
 
 
 int main(int argc, char* argv[]) {
-	Pr4(argc, argv);
+	EjercicioGrupoErrores(argc, argv);
 
 	return 0;
 }
