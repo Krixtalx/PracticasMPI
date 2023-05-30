@@ -8,41 +8,41 @@
 void Pr1(int argc, char* argv[]) {
 	int _processId, _numProcs;
 
-	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	MPI_Init(&argc, &argv); //Inicializaciï¿½n OpenMPI
 	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
-	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nï¿½ de procesos
 
 	std::cout << "Hola mundo. Proceso " << _processId << std::endl;
-	if (_processId == 0) //Hacemos que solo el proceso "principal" muestre el nº de procesos disponibles.
+	if (_processId == 0) //Hacemos que solo el proceso "principal" muestre el nï¿½ de procesos disponibles.
 		std::cout << "Numero de procesos: " << _numProcs << std::endl;
 
-	MPI_Finalize(); //Finalización OpenMPI
+	MPI_Finalize(); //Finalizaciï¿½n OpenMPI
 }
 
 void Pr2(int argc, char* argv[]) {
 	int _processId, _numProcs, _contrincante;
 	int _pingPong = 0;
 
-	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	MPI_Init(&argc, &argv); //Inicializaciï¿½n OpenMPI
 	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
-	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nï¿½ de procesos
 
-	//Solo comenzará el juego en caso de que el nº de procesos sea par.
+	//Solo comenzarï¿½ el juego en caso de que el nï¿½ de procesos sea par.
 	if (_numProcs % 2 == 0) {
-		//Si el proceso es par, el contrincante será el id del proceso + 1. En caso contrario, id del proceso - 1
+		//Si el proceso es par, el contrincante serï¿½ el id del proceso + 1. En caso contrario, id del proceso - 1
 		_contrincante = _processId % 2 == 0 ? _processId + 1 : _processId - 1;
 
 		//Mientras no se alcancen los 6 toques...
 		while (_pingPong < 6) {
 			std::cout << "Soy el proceso " << _processId << " y juego con el proceso " << _contrincante;
-			//Lo que deberá hacer cada proceso dependerá de si ha comenzado el la partida y del turno por el que vaya.
+			//Lo que deberï¿½ hacer cada proceso dependerï¿½ de si ha comenzado el la partida y del turno por el que vaya.
 			if ((_processId + _pingPong) % 2 == 0) {
 				_pingPong++;
-				//Incrementamos el valor de la variable _pingPong y enviamos el nuevo valor a nuestro contrincante. Se ha usado un Send bloqueante, aunque se podría cambiar por uno asincrono. 
+				//Incrementamos el valor de la variable _pingPong y enviamos el nuevo valor a nuestro contrincante. Se ha usado un Send bloqueante, aunque se podrï¿½a cambiar por uno asincrono. 
 				MPI_Send(&_pingPong, 1, MPI_INT, _contrincante, 0, MPI_COMM_WORLD);
 				std::cout << ". Envio " << _pingPong << std::endl;
 			} else {
-				//Almacenamos el valor recibido sobreescribiendo el valor de _pingPong. El Recv que se ha usado es bloqueante, por lo que el proceso se bloqueará en este punto hasta que reciba el mensaje. 
+				//Almacenamos el valor recibido sobreescribiendo el valor de _pingPong. El Recv que se ha usado es bloqueante, por lo que el proceso se bloquearï¿½ en este punto hasta que reciba el mensaje. 
 				MPI_Recv(&_pingPong, 1, MPI_INT, _contrincante, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 				std::cout << ". Recibo " << _pingPong << std::endl;
 			}
@@ -51,19 +51,19 @@ void Pr2(int argc, char* argv[]) {
 		if (_processId == 0)
 			std::cout << "No se puede comenzar el juego debido a que el numero de procesos es impar." << std::endl;
 	}
-	MPI_Finalize(); //Finalización OpenMPI
+	MPI_Finalize(); //Finalizaciï¿½n OpenMPI
 }
 
 void Pr3(int argc, char* argv[]) {
 	int _processId, _numProcs;
-	unsigned _numPoints = 10000000; //nº de puntos a lanzar.
-	unsigned _counter = 0; //nº de puntos en el interior de la circuferencia. 
+	unsigned _numPoints = 10000000; //nï¿½ de puntos a lanzar.
+	unsigned _counter = 0; //nï¿½ de puntos en el interior de la circuferencia. 
 
-	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	MPI_Init(&argc, &argv); //Inicializaciï¿½n OpenMPI
 	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
-	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nï¿½ de procesos
 
-	//Generador de números aleatorios. Se utiliza una distribución uniforme.
+	//Generador de nï¿½meros aleatorios. Se utiliza una distribuciï¿½n uniforme.
 	std::random_device rd;
 	std::mt19937 gen(rd());
 	std::uniform_real_distribution<> dis(-1, 1);
@@ -76,15 +76,15 @@ void Pr3(int argc, char* argv[]) {
 		if (_squareDistance <= 1)
 			_counter++;
 	}
-	double _q = (double)_counter / (double)_numPoints; //Hacemos casteo a double para evitar división de enteros.
+	double _q = (double)_counter / (double)_numPoints; //Hacemos casteo a double para evitar divisiï¿½n de enteros.
 
-	//Creamos un buffer usando memoria dinámica para hacerlo adaptativo al nº de procesos.
+	//Creamos un buffer usando memoria dinï¿½mica para hacerlo adaptativo al nï¿½ de procesos.
 	double* _buffer = new double[_numProcs];
 	for (size_t i = 0; i < _numProcs; i++) {
 		_buffer[i] = 0;
 	}
 
-	//Todos los procesos envian sus resultados al proceso 0, quien realizará la agregación.
+	//Todos los procesos envian sus resultados al proceso 0, quien realizarï¿½ la agregaciï¿½n.
 	MPI_Gather(&_q, 1, MPI_DOUBLE, _buffer, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 	//Se agregan los resultados de cada uno de los procesos y se obtiene el resultado final. 
@@ -94,30 +94,30 @@ void Pr3(int argc, char* argv[]) {
 			_q += _buffer[i];
 		}
 		_q *= 4 / (double)_numProcs;
-		std::cout << "Aproximación de Pi: " << _q << std::endl;
+		std::cout << "Aproximaciï¿½n de Pi: " << _q << std::endl;
 	}
 
-	MPI_Finalize(); //Finalización OpenMPI
+	MPI_Finalize(); //Finalizaciï¿½n OpenMPI
 }
 
 void Pr4(int argc, char* argv[]) {
 	int _processId, _numProcs;
-	const int _numDatos = 100000; //Número de datos total a repartir entre todos los procesos.
-	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	const int _numDatos = 100000; //Nï¿½mero de datos total a repartir entre todos los procesos.
+	MPI_Init(&argc, &argv); //Inicializaciï¿½n OpenMPI
 	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
-	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nï¿½ de procesos
 
-	const int fixedValue = _numDatos + _numDatos % _numProcs; //Ajustamos el nº de valores en función al nº de procesos, de manera que todos los procesos reciban la misma cantidad de datos, aunque unos pocos sean nulos.
+	const int fixedValue = _numDatos + _numDatos % _numProcs; //Ajustamos el nï¿½ de valores en funciï¿½n al nï¿½ de procesos, de manera que todos los procesos reciban la misma cantidad de datos, aunque unos pocos sean nulos.
 	const int dataPerProcess = fixedValue / _numProcs; //Calculamos cuantos datos se le envia a cada proceso.
 	int* _partialBuffer = new int[dataPerProcess]; //Reservamos memoria en cada proceso para recibir los datos enviados por _processId==0.
 
 	if (_processId == 0) {
 		int* _buffer = new int[fixedValue];
 		for (int i = 0; i < _numDatos; i++) {
-			_buffer[i] = i; //Rellenamos el buffer de valores a enviar de manera secuencial. De esta manera sabemos que el valor final deberá de ser _numDatos-1
+			_buffer[i] = i; //Rellenamos el buffer de valores a enviar de manera secuencial. De esta manera sabemos que el valor final deberï¿½ de ser _numDatos-1
 		}
 		for (int i = _numDatos; i < fixedValue; i++) {
-			_buffer[i] = INT32_MIN; //Se añaden los valores "nulos" al final del buffer. El valor nulo dependerá de la operación utilizada. En este caso es el valor MIN de int32. En caso de que la operación fuera suma, el nulo sería 0. 
+			_buffer[i] = INT32_MIN; //Se aï¿½aden los valores "nulos" al final del buffer. El valor nulo dependerï¿½ de la operaciï¿½n utilizada. En este caso es el valor MIN de int32. En caso de que la operaciï¿½n fuera suma, el nulo serï¿½a 0. 
 		}
 		MPI_Scatter(_buffer, dataPerProcess, MPI_INT, _partialBuffer, dataPerProcess, MPI_INT, 0, MPI_COMM_WORLD); //Repartimos los datos entre todos los procesos.
 		delete[] _buffer;
@@ -125,14 +125,14 @@ void Pr4(int argc, char* argv[]) {
 		MPI_Scatter(nullptr, 0, MPI_INT, _partialBuffer, dataPerProcess, MPI_INT, 0, MPI_COMM_WORLD); //Recibimos los datos en los procesos "trabajadores"
 	}
 	int _currentMax = INT32_MIN;
-	for (int i = 0; i < dataPerProcess; i++) { //Calculamos el máximo del subconjunto de datos de este proceso. 
+	for (int i = 0; i < dataPerProcess; i++) { //Calculamos el mï¿½ximo del subconjunto de datos de este proceso. 
 		if (_currentMax < _partialBuffer[i])
 			_currentMax = _partialBuffer[i];
 	}
 	std::cout << "Soy el proceso " << _processId << " y mi maximo es " << _currentMax << std::endl;
 
 	int _finalMax = 0;
-	MPI_Reduce(&_currentMax, &_finalMax, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD); //Enviamos los resultados obtenidos al proceso principal, quien realizará la reducción final. 
+	MPI_Reduce(&_currentMax, &_finalMax, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD); //Enviamos los resultados obtenidos al proceso principal, quien realizarï¿½ la reducciï¿½n final. 
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
@@ -140,13 +140,31 @@ void Pr4(int argc, char* argv[]) {
 		std::cout << "Soy el proceso " << _processId << " y el maximo final es " << _finalMax << std::endl;
 
 	delete[] _partialBuffer;
-	MPI_Finalize(); //Finalización OpenMPI
+	MPI_Finalize(); //Finalizaciï¿½n OpenMPI
 }
 
+void Pr5(int argc, char* argv[]){
+	int _processId, _numProcs;
+	int matrixADim[]={3,3};
+	int matrixBDim[]={3,2};
 
+	int matrixA[]={	3, 2, 1,
+					1, 1, 3,
+					0, 2, 1};
+
+	int matrixB[]={	2, 1,
+					1, 0,
+					3, 2};
+
+	MPI_Init(&argc, &argv); //Inicializaciï¿½n OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nï¿½ de procesos
+
+
+}
 
 int main(int argc, char* argv[]) {
-	EjercicioGrupoErrores(argc, argv);
+	EjercicioIntercomunicadores(argc, argv);
 
 	return 0;
 }

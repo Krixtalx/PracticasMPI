@@ -11,3 +11,4 @@ void EjercicioTypeVector(int argc, char* argv[]);
 void EjercicioTerna(int argc, char* argv[]);
 void EjercicioComunicadores(int argc, char* argv[]);
 void EjercicioGrupoErrores(int argc, char* argv[]);
+void EjercicioIntercomunicadores(int argc, char* argv[]);

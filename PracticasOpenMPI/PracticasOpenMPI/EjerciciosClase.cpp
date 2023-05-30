@@ -308,8 +308,38 @@ void EjercicioGrupoErrores(int argc, char* argv[]) {
 	if (errorCode == MPI_SUCCESS) {
 		MPI_Bcast(&n, 1, MPI_INT, 0, newComm);
 		std::cout << "Soy el proceso " << _processId << " con nuevo rank " << newRank << " y recibo " << n << std::endl;
-	}else{
+	} else {
 		std::cout << "Soy el proceso " << _processId << " y no he podido obtener un nuevo rango" << std::endl;
+	}
+
+	MPI_Finalize(); //Finalización OpenMPI
+}
+
+void EjercicioIntercomunicadores(int argc, char* argv[]) {
+	int _processId, _numProcs;
+	int n = -1;
+
+	MPI_Comm splitComm, interComm;
+
+	MPI_Init(&argc, &argv); //Inicialización OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // Nº de procesos
+
+	int color = _processId % 2;
+
+
+	MPI_Comm_split(MPI_COMM_WORLD, color, _processId, &splitComm);
+	MPI_Intercomm_create(splitComm, 0, MPI_COMM_WORLD, 1 - color, 0, &interComm);
+
+	int newRank = -1;
+	if (color)
+		MPI_Comm_rank(splitComm, &newRank);
+
+	if (color) {
+		MPI_Recv(&n, 1, MPI_INT, newRank, 0, interComm, MPI_STATUS_IGNORE);
+		std::cout << "Soy el proceso " << _processId << " con nuevo rank " << newRank << " y recibo " << n << std::endl;
+	} else {
+		MPI_Send(&_processId, 1, MPI_INT, _processId, 0, interComm);
 	}
 
 	MPI_Finalize(); //Finalización OpenMPI
