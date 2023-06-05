@@ -1,4 +1,2 @@
-﻿  EjerciciosClase.cpp
-C:\Github\PracticasMPI\PracticasOpenMPI\PracticasOpenMPI\EjerciciosClase.cpp(84,17): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
-C:\Github\PracticasMPI\PracticasOpenMPI\PracticasOpenMPI\EjerciciosClase.cpp(121,40): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
+﻿  Main.cpp
   PracticasOpenMPI.vcxproj -> C:\Github\PracticasMPI\PracticasOpenMPI\x64\Debug\PracticasOpenMPI.exe

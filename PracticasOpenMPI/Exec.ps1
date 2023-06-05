@@ -1,2 +1,2 @@
-mpiexec -n 2 x64\Debug\PracticasOpenMPI.exe
+mpiexec -n 4 x64\Debug\PracticasOpenMPI.exe 3
 pause

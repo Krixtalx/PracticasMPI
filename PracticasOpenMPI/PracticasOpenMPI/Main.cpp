@@ -2,6 +2,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono> 
+#include <iomanip>
 #include <random>
 #include "EjerciciosClase.h"
 
@@ -102,7 +103,7 @@ void Pr3(int argc, char* argv[]) {
 
 void Pr4(int argc, char* argv[]) {
 	int _processId, _numProcs;
-	const int _numDatos = 100000; //N�mero de datos total a repartir entre todos los procesos.
+	constexpr int _numDatos = 100000; //N�mero de datos total a repartir entre todos los procesos.
 	MPI_Init(&argc, &argv); //Inicializaci�n OpenMPI
 	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
 	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // N� de procesos
@@ -143,28 +144,203 @@ void Pr4(int argc, char* argv[]) {
 	MPI_Finalize(); //Finalizaci�n OpenMPI
 }
 
-void Pr5(int argc, char* argv[]){
+void printMatrix(const int* matrix, const int numCol, const int numRows) {
+	for (int cols = 0; cols < numCol; ++cols) {
+		for (int rows = 0; rows < numRows; ++rows) {
+			std::cout << std::setw(3);
+			std::cout << matrix[cols * numRows + rows] << " ";
+		}
+		std::cout << std::endl;
+	}
+}
+
+void Pr5(int argc, char* argv[]) {
 	int _processId, _numProcs;
-	int matrixADim[]={3,3};
-	int matrixBDim[]={3,2};
+	constexpr int matrixADim[] = { 3,3 };
+	constexpr int matrixBDim[] = { 3,2 };
+	constexpr int dimFinalMatrix = matrixADim[0] * matrixBDim[1];
+	constexpr int multSize = matrixADim[1] + matrixBDim[0];
+	const int matrixA[] = { 3, 2, 1,
+							1, 1, 3,
+							0, 2, 1 };
 
-	int matrixA[]={	3, 2, 1,
-					1, 1, 3,
-					0, 2, 1};
+	const int matrixB[] = { 2, 1,
+							1, 0,
+							3, 2, };
 
-	int matrixB[]={	2, 1,
-					1, 0,
-					3, 2};
+	int receiveBuffer[multSize];
 
 	MPI_Init(&argc, &argv); //Inicializaci�n OpenMPI
 	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
 	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // N� de procesos
 
+	if (_numProcs < dimFinalMatrix) { //Una limitación de esta implementación es que es necesario tener el mismo número de procesos que el tamaño final de la matriz.
+		if (_processId == 0)
+			std::cout << "Numero de procesos insuficiente" << std::endl;
+	} else {
+		if (_processId == 0) {
+			//Proceso principal
+			const auto packedMatrix = new int[dimFinalMatrix * multSize]; //Creamos una matriz nueva donde agruparemos en cada "fila" lo que se enviará a cada proceso.
+			int packedMatrixIndex = 0;
+			for (int matrixAi = 0; matrixAi < matrixADim[0]; ++matrixAi) {
+				for (int matrixBi = 0; matrixBi < matrixBDim[1]; ++matrixBi) {
+					for (int matrixAj = 0; matrixAj < matrixADim[1]; ++matrixAj) {
+						packedMatrix[packedMatrixIndex++] = matrixA[matrixAi * matrixADim[0] + matrixAj];
+					}
+					for (int matrixBj = 0; matrixBj < matrixBDim[0]; ++matrixBj) {
+						packedMatrix[packedMatrixIndex++] = matrixB[matrixBi + matrixBj * matrixBDim[1]];
+					}
+				}
+			}
+			MPI_Scatter(packedMatrix, multSize, MPI_INT, &receiveBuffer, multSize, MPI_INT, 0, MPI_COMM_WORLD); //Enviamos a cada proceso los datos que necesita para realizar la multiplicación
+			delete[] packedMatrix;
+		} else {
+			MPI_Scatter(nullptr, 0, MPI_INT, &receiveBuffer, multSize, MPI_INT, 0, MPI_COMM_WORLD); //Recibimos los datos en los procesos secundarios.
+		}
 
+		int result = 0;
+		for (int i = 0; i < matrixADim[1]; ++i) {
+			result += receiveBuffer[i] * receiveBuffer[i + matrixADim[1]]; //Calculamos el resultado parcial
+		}
+
+		if (_processId == 0) {
+			int finalMatrix[dimFinalMatrix];
+			MPI_Gather(&result, 1, MPI_INT, finalMatrix, 1, MPI_INT, 0, MPI_COMM_WORLD); //Recibimos los resultados parciales de cada una de los procesos
+			std::cout << "Resultado de la multiplicacion de matrices: " << std::endl;
+			printMatrix(finalMatrix, matrixADim[0], matrixBDim[1]); //Mostramos por pantalla el resultado final
+		} else {
+			MPI_Gather(&result, 1, MPI_INT, nullptr, 0, MPI_INT, 0, MPI_COMM_WORLD); //Enviamos al proceso principal el resultado parcial calculado.
+		}
+	}
+
+	MPI_Finalize(); //Finalizaci�n OpenMPI
+}
+
+void Pr6(int argc, char* argv[]) {
+	int _processId, _numProcs;
+	constexpr int dim[] = { 4,4 };
+	constexpr int periods[] = { true, true };
+	int numAEnviar = 10; //Indica la cantidad de numeros aleatorios que enviarán los procesos de las filas 0. 
+	int coords[2];
+	int n = 0;
+	int n2 = 0;
+	MPI_Init(&argc, &argv); //Inicializaci�n OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // N� de procesos
+	srand(_processId);
+
+	MPI_Comm cartComm;
+	MPI_Cart_create(MPI_COMM_WORLD, 2, dim, periods, true, &cartComm);
+	MPI_Cart_coords(cartComm, _processId, 2, coords);
+
+	if (coords[1] == 1 || coords[1] == 2)
+		numAEnviar++; //Ajustamos el nº de iteraciones de las filas intermedias, que deben de realizar una mas
+
+	for (int i = 0; i < numAEnviar; ++i) {
+		switch (coords[1]) {
+		case 0:
+			n = rand() % 20 + 1;
+			n += n % 2;
+			MPI_Send(&n, 1, MPI_INT, _processId + 1, 0, cartComm); //Los procesos de la fila 0 solo envian el nº aleatorio generado. 
+			std::cout << "It " << i << ": " << "Soy el proceso " << _processId << " en fila " << coords[1] << " y columna " << coords[0] << " y envio " << n << " al proceso " << _processId + 1 << std::endl;
+			break;
+		case 1:
+			if (i == 0) { //Los procesos de la fila 1 y 2 solo reciben en la primera it
+				MPI_Recv(&n, 1, MPI_INT, _processId - 1, 0, cartComm, MPI_STATUS_IGNORE);
+				std::cout << "It " << i << ": " << "Soy el proceso " << _processId << " en fila " << coords[1] << " y columna " << coords[0] << " y recibo " << n << std::endl;
+			} else if (i < numAEnviar - 1) { //Los procesos de la fila 1 y 2 reciben y envian en las it intermedias
+				n2 = n / 2;
+				MPI_Sendrecv(&n2, 1, MPI_INT, _processId + 1, 0, &n, 1, MPI_INT, _processId - 1, 0, cartComm, MPI_STATUS_IGNORE);
+				std::cout << "It " << i << ": " << "Soy el proceso " << _processId << " en fila " << coords[1] << " y columna " << coords[0] << ". Recibo " << n << " y envio " << n2 << " al proceso " << _processId + 1 << std::endl;
+			} else { //Los procesos de la fila 1 y 2 solo envian en la última it
+				n2 = n / 2;
+				MPI_Send(&n2, 1, MPI_INT, _processId + 1, 0, cartComm);
+				std::cout << "It " << i << ": " << "Soy el proceso " << _processId << " en fila " << coords[1] << " y columna " << coords[0] << " y envio " << n2 << " al proceso " << _processId + 1 << std::endl;
+			}
+			break;
+		case 2:
+			if (i == 0) {//Los procesos de la fila 1 y 2 solo reciben en la primera it
+				MPI_Recv(&n, 1, MPI_INT, _processId - 1, 0, cartComm, MPI_STATUS_IGNORE);
+				std::cout << "It " << i << ": " << "Soy el proceso " << _processId << " en fila " << coords[1] << " y columna " << coords[0] << " y recibo " << n << std::endl;
+			} else if (i < numAEnviar - 1) {//Los procesos de la fila 1 y 2 reciben y envian en las it intermedias
+				n2 = n + 100;
+				MPI_Sendrecv(&n2, 1, MPI_INT, _processId + 1, 0, &n, 1, MPI_INT, _processId - 1, 0, cartComm, MPI_STATUS_IGNORE);
+				std::cout << "It " << i << ": " << "Soy el proceso " << _processId << " en fila " << coords[1] << " y columna " << coords[0] << ". Recibo " << n << " y envio " << n2 << " al proceso " << _processId + 1 << std::endl;
+			} else {//Los procesos de la fila 1 y 2 solo envian en la última it
+				n2 = n + 100;
+				MPI_Send(&n2, 1, MPI_INT, _processId + 1, 0, cartComm);
+				std::cout << "It " << i << ": " << "Soy el proceso " << _processId << " en fila " << coords[1] << " y columna " << coords[0] << " y envio " << n2 << " al proceso " << _processId + 1 << std::endl;
+			}
+			break;
+		case 3:
+			//Los procesos de la fila 3 solo reciben el dato y muestran el resultado final.
+			MPI_Recv(&n, 1, MPI_INT, _processId - 1, 0, cartComm, MPI_STATUS_IGNORE);
+			n2 = n * 2;
+			std::cout << "It " << i << ": " << "Soy el proceso " << _processId << " en fila " << coords[1] << " y columna " << coords[0] << ". Recibo " << n << " y doy como resultado final " << n2 << std::endl;
+			break;
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+		if (_processId == 1) {
+			std::cout << std::endl << "Nuevo ciclo" << std::endl;
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+	}
+
+	MPI_Finalize(); //Finalizaci�n OpenMPI
+}
+
+void Pr7(int argc, char* argv[]) {
+	int _processId, _numProcs;
+	constexpr int _numDatos = 10000; //Tam del buffer a enviar
+	int _buffer[_numDatos];
+
+	MPI_Init(&argc, &argv); //Inicializaci�n OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // N� de procesos
+	if (_processId == 0) {
+		std::cout << "Tam del buffer " << _numDatos << std::endl;
+	}
+	std::this_thread::sleep_for(std::chrono::milliseconds(20));
+	if (argc == 2) {
+		const int op = atoi(argv[1]);
+		switch (op) {
+		case 0:
+			std::cout << "Soy el proceso " << _processId << " y voy a enviar el buffer a " << (_processId + 1) % _numProcs << " en el modo Ssend" << std::endl;
+			_buffer[0] = _processId;
+			MPI_Ssend(_buffer, _numDatos, MPI_INT, (_processId + 1) % _numProcs, 0, MPI_COMM_WORLD);
+			MPI_Recv(_buffer, _numDatos, MPI_INT, (_processId - 1) % _numProcs, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			std::cout << "Soy el proceso " << _processId << " y he recibido " << _buffer[0] << std::endl;
+			break;
+		case 1:
+			std::cout << "Soy el proceso " << _processId << " y voy a enviar el buffer a " << (_processId + 1) % _numProcs << " en el modo Rsend" << std::endl;
+			_buffer[0] = _processId;
+			MPI_Rsend(_buffer, _numDatos, MPI_INT, (_processId + 1) % _numProcs, 0, MPI_COMM_WORLD);
+			MPI_Recv(_buffer, _numDatos, MPI_INT, (_processId - 1) % _numProcs, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			std::cout << "Soy el proceso " << _processId << " y he recibido " << _buffer[0] << std::endl;
+			break;
+		case 2:
+			std::cout << "Soy el proceso " << _processId << " y voy a enviar el buffer a " << (_processId + 1) % _numProcs << " en el modo Bsend" << std::endl;
+			_buffer[0] = _processId;
+			MPI_Bsend(_buffer, _numDatos, MPI_INT, (_processId + 1) % _numProcs, 0, MPI_COMM_WORLD);
+			MPI_Recv(_buffer, _numDatos, MPI_INT, (_processId - 1) % _numProcs, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			std::cout << "Soy el proceso " << _processId << " y he recibido " << _buffer[0] << std::endl;
+			break;
+		case 3:
+			std::cout << "Soy el proceso " << _processId << " y voy a enviar el buffer a " << (_processId + 1) % _numProcs << " en el modo Send" << std::endl;
+			_buffer[0] = _processId;
+			MPI_Send(_buffer, _numDatos, MPI_INT, (_processId + 1) % _numProcs, 0, MPI_COMM_WORLD);
+			MPI_Recv(_buffer, _numDatos, MPI_INT, (_processId - 1) % _numProcs, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			std::cout << "Soy el proceso " << _processId << " y he recibido " << _buffer[0] << std::endl;
+			break;
+		}
+	}
+
+	MPI_Finalize(); //Finalizaci�n OpenMPI
 }
 
 int main(int argc, char* argv[]) {
-	EjercicioIntercomunicadores(argc, argv);
+	Pr7(argc, argv);
 
 	return 0;
 }
