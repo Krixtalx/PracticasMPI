@@ -4,6 +4,7 @@
 #include <chrono> 
 #include <iomanip>
 #include <random>
+#include <cmath>
 #include "EjerciciosClase.h"
 
 void Pr1(int argc, char* argv[]) {
@@ -292,7 +293,7 @@ void Pr6(int argc, char* argv[]) {
 
 void Pr7(int argc, char* argv[]) {
 	int _processId, _numProcs;
-	constexpr int _numDatos = 10000; //Tam del buffer a enviar
+	constexpr int _numDatos = 100000; //Tam del buffer a enviar
 	int _buffer[_numDatos];
 
 	MPI_Init(&argc, &argv); //Inicializaci�n OpenMPI
@@ -304,36 +305,51 @@ void Pr7(int argc, char* argv[]) {
 	std::this_thread::sleep_for(std::chrono::milliseconds(20));
 	if (argc == 2) {
 		const int op = atoi(argv[1]);
+		//Dependiendo del parámetro especificado como argumento, se realizará una operación u otra. 
 		switch (op) {
 		case 0:
 			std::cout << "Soy el proceso " << _processId << " y voy a enviar el buffer a " << (_processId + 1) % _numProcs << " en el modo Ssend" << std::endl;
 			_buffer[0] = _processId;
 			MPI_Ssend(_buffer, _numDatos, MPI_INT, (_processId + 1) % _numProcs, 0, MPI_COMM_WORLD);
-			MPI_Recv(_buffer, _numDatos, MPI_INT, (_processId - 1) % _numProcs, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			MPI_Recv(_buffer, _numDatos, MPI_INT, _processId != 0 ? (_processId - 1) % _numProcs : _numProcs - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
 			std::cout << "Soy el proceso " << _processId << " y he recibido " << _buffer[0] << std::endl;
 			break;
 		case 1:
 			std::cout << "Soy el proceso " << _processId << " y voy a enviar el buffer a " << (_processId + 1) % _numProcs << " en el modo Rsend" << std::endl;
 			_buffer[0] = _processId;
 			MPI_Rsend(_buffer, _numDatos, MPI_INT, (_processId + 1) % _numProcs, 0, MPI_COMM_WORLD);
-			MPI_Recv(_buffer, _numDatos, MPI_INT, (_processId - 1) % _numProcs, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			MPI_Recv(_buffer, _numDatos, MPI_INT, _processId != 0 ? (_processId - 1) % _numProcs : _numProcs - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			std::cout << "Soy el proceso " << _processId << " y he recibido " << _buffer[0] << std::endl;
 			break;
 		case 2:
+		{
 			std::cout << "Soy el proceso " << _processId << " y voy a enviar el buffer a " << (_processId + 1) % _numProcs << " en el modo Bsend" << std::endl;
 			_buffer[0] = _processId;
+			int size = _numDatos + static_cast<int>((MPI_BSEND_OVERHEAD / sizeof(int)));
+			const auto _bsendBuffer = new int[size];
+			size *= sizeof(int);
+			MPI_Buffer_attach(_bsendBuffer, size);
 			MPI_Bsend(_buffer, _numDatos, MPI_INT, (_processId + 1) % _numProcs, 0, MPI_COMM_WORLD);
-			MPI_Recv(_buffer, _numDatos, MPI_INT, (_processId - 1) % _numProcs, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			MPI_Recv(_buffer, _numDatos, MPI_INT, _processId != 0 ? (_processId - 1) % _numProcs : _numProcs - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			std::cout << "Soy el proceso " << _processId << " y he recibido " << _buffer[0] << std::endl;
-			break;
+			MPI_Buffer_detach(_bsendBuffer, &size);
+			delete[] _bsendBuffer;
+		}
+		break;
 		case 3:
 			std::cout << "Soy el proceso " << _processId << " y voy a enviar el buffer a " << (_processId + 1) % _numProcs << " en el modo Send" << std::endl;
 			_buffer[0] = _processId;
 			MPI_Send(_buffer, _numDatos, MPI_INT, (_processId + 1) % _numProcs, 0, MPI_COMM_WORLD);
-			MPI_Recv(_buffer, _numDatos, MPI_INT, (_processId - 1) % _numProcs, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			MPI_Recv(_buffer, _numDatos, MPI_INT, _processId != 0 ? (_processId - 1) % _numProcs : _numProcs - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			std::cout << "Soy el proceso " << _processId << " y he recibido " << _buffer[0] << std::endl;
 			break;
+		default:
+			std::cout << "No se ha especificado un modo de operación válido en el argumento" << std::endl;
+			break;
 		}
+	} else {
+		std::cout << "No se ha especificado el modo de operación en el argumento" << std::endl;
 	}
 
 	MPI_Finalize(); //Finalizaci�n OpenMPI
