@@ -4,7 +4,12 @@
 #include <chrono> 
 #include <iomanip>
 #include <random>
-#include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <map>
+#include <set>
+#include <string>
+
 #include "EjerciciosClase.h"
 
 void Pr1(int argc, char* argv[]) {
@@ -355,8 +360,169 @@ void Pr7(int argc, char* argv[]) {
 	MPI_Finalize(); //Finalizaci�n OpenMPI
 }
 
+//Estructura para almacenar los datos de las películas
+struct puntuacionFinal {
+	int _filmId = 0;
+	mutable int _numVal = 0;
+	mutable int _valSum = 0;
+
+	float getMean() const {
+		if (_numVal == 0)
+			return 0;
+		return static_cast<float>(_valSum) / static_cast<float>(_numVal);
+	}
+
+	friend bool operator < (const puntuacionFinal& a, const puntuacionFinal& b) {
+		return a._filmId < b._filmId;
+	}
+};
+
+void Pr8(int argc, char* argv[]) {
+	int _processId, _numProcs;
+	MPI_File _dataFile;
+	MPI_Offset _fileSize;
+	unsigned _lineSize = 0;
+	unsigned _numLineas = 0;
+	std::set<puntuacionFinal> _valPeliculas;
+	const std::string _fileName = "practica8_data.txt";
+
+	MPI_Init(&argc, &argv); //Inicializacion OpenMPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &_processId);  // ID del proceso actual
+	MPI_Comm_size(MPI_COMM_WORLD, &_numProcs);      // N de procesos
+
+	//Hacemos que el fichero principal examine la primera linea del fichero para obtener parámetros necesarios como la longitud de linea. 
+	if (_processId == 0) {
+		std::ifstream input(_fileName, std::ios::binary);
+		if (input.good()) {
+			std::string line;
+			std::getline(input, line, '\r'); //Se usa '\r' dado que el fichero ha sido creado con un macintosh que utiliza CR para el salto de línea. 
+			_lineSize = line.length() + 1;
+		}
+		input.close();
+		std::cout << "[Proceso " << _processId << "]: El tam de linea es de " << _lineSize << " caracteres" << std::endl;
+	}
+	MPI_Bcast(&_lineSize, 1, MPI_INT, 0, MPI_COMM_WORLD); //Se envia el tamaño de linea a cada proceso 
+
+	//Abrimos el fichero en modo lectura. 
+	MPI_File_open(MPI_COMM_WORLD, _fileName.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &_dataFile);
+	MPI_File_get_size(_dataFile, &_fileSize);
+	//Calculamos el número de lineas en función al tamaño total del fichero y al tamaño de cada linea. 
+	_numLineas = _fileSize / (_lineSize * sizeof(char) * _numProcs);
+	if (_processId == 0)
+		std::cout << "[Proceso " << _processId << "]: El fichero abierto tiene un tam de " << _fileSize << " bytes" << std::endl;
+	std::cout << "[Proceso " << _processId << "]: Procesando " << _numLineas << " lineas..." << std::endl;
+
+	//Creamos los tipo de datos necesarios para que ajustar el offset de cada proceso, de manera que cada proceso lea lineas distintas sin solaparse.
+	MPI_Datatype line;
+	MPI_Datatype readCycle;
+	MPI_Aint lb;
+	MPI_Aint extent;
+	MPI_Type_contiguous(_lineSize, MPI_CHAR, &line);
+	MPI_Type_commit(&line);
+	MPI_Type_get_extent(line, &lb, &extent);
+	MPI_Type_create_resized(line, 0, _numProcs * extent, &readCycle);
+	MPI_Type_commit(&readCycle);
+
+	//Crearemos una vista para que cada proceso lea una linea distinta.
+	MPI_File_set_view(_dataFile, _processId * extent, line, readCycle, "native", MPI_INFO_NULL);
+
+	//Creamos la estructura de datos donde cargar todas las lineas que deba leer el proceso.
+	const int numChar = (_lineSize * _numLineas);
+	const auto text = new char[numChar];
+	//Leemos el fichero completamente.
+	MPI_File_read(_dataFile, text, numChar, MPI_CHAR, MPI_STATUS_IGNORE);
+
+	//Procesamos el fichero completo almacenando los datos formateados y agregados en un set.
+	for (int i = 0; i < _numLineas; ++i) {
+		const int offset = i * _lineSize;
+		std::string aux;
+		/*aux.assign(text + offset, text + offset + 5);
+		const int userId = std::stoi(aux);*/
+		aux.assign(text + offset + 5, text + offset + 10);
+		const int filmId = std::stoi(aux);
+		aux.assign(text + offset + 10, text + offset + 12);
+		const int val = std::stoi(aux);
+		//std::cout << "Usuario " << userId << " - Pelicula " << filmId << " - Val " << val << std::endl;
+		auto vec = _valPeliculas.find({ filmId });
+		if (vec != _valPeliculas.end()) {
+			vec->_numVal++;
+			vec->_valSum += val;
+		} else {
+			puntuacionFinal p{ filmId, 1, val };
+			_valPeliculas.insert(p);
+		}
+	}
+	std::cout << "[Proceso " << _processId << "]: Procesamiento de texto finalizado" << std::endl;
+
+	//Realizamos una transformación a vector para poder enviarlo con OpenMPI.
+	std::vector<puntuacionFinal> resultadosParciales;
+	resultadosParciales.reserve(_valPeliculas.size());
+	for (const auto& val_pelicula : _valPeliculas) {
+		resultadosParciales.emplace_back(val_pelicula);
+		//std::cout << "Pelicula " << val_pelicula._filmId << " - Val " << val_pelicula.getMean() << std::endl;
+	}
+
+	//Calculamos el tam maximo de resultados parciales para poder añadir resultados "nulos" en los procesos con menor num de resultados.
+	int auxSize = resultadosParciales.size();
+	int maxResultSize = 0;
+	MPI_Allreduce(&auxSize, &maxResultSize, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+
+	for (int i = auxSize; i < maxResultSize; ++i) {
+		resultadosParciales.push_back({});
+	}
+
+	if (_processId == 0) {
+		std::vector<puntuacionFinal> resultados;
+		//Reservamos memoria suficiente para recibir todos los resultados
+		resultados.resize(maxResultSize * _numProcs);
+		std::cout << "[Proceso " << _processId << "]: Recibiendo datos..." << std::endl;
+		//Usamos el gather para recibir el gather de todos los procesos. Calculamos el tam de bytes a enviar respecto a int. De esta manera nos ahorramos tener que declarar un tipo de datos OpenMPI.
+		MPI_Gather(resultadosParciales.data(), resultadosParciales.size() * sizeof(puntuacionFinal) / sizeof(int), MPI_INT, resultados.data(), maxResultSize * sizeof(puntuacionFinal) / sizeof(int), MPI_INT, 0, MPI_COMM_WORLD);
+		//Reutilizamos el set para agregar los resultados parciales de cada proceso.
+		_valPeliculas.clear();
+		for (const auto& resultado : resultados) {
+			auto vec = _valPeliculas.find(resultado);
+			if (vec != _valPeliculas.end()) {
+				vec->_numVal += resultado._numVal;
+				vec->_valSum += resultado._valSum;
+			} else {
+				_valPeliculas.insert(resultado);
+			}
+			//std::cout << "Pelicula " << resultado._filmId << " - Val " << resultado.getMean() << std::endl;
+		}
+		//Transformamos a vector para poder usar la función sort. 
+		std::vector<puntuacionFinal> resultadosFinales;
+		resultadosFinales.reserve(_valPeliculas.size());
+		for (const auto& val_pelicula : _valPeliculas) {
+			resultadosFinales.emplace_back(val_pelicula);
+			//std::cout << "Pelicula " << val_pelicula._filmId << " - Val " << val_pelicula.getMean() << std::endl;
+		}
+		//Ordenamos en función a la media
+		std::sort(resultadosFinales.begin(), resultadosFinales.end(),
+			[](const puntuacionFinal& a, const puntuacionFinal& b) {
+				return a.getMean() > b.getMean();
+			});
+		//Mostramos por pantalla las 10 películas con mejores puntuaciones que superen las 20 valoraciones.
+		int fallos = 0;
+		for (int i = 0; i < 10; ++i) {
+			if (resultadosFinales[i + fallos]._numVal < 20) {
+				i--;
+				fallos++;
+			} else
+				std::cout << "Puesto " << i + 1 << ": Pelicula " << resultadosFinales[i + fallos]._filmId << ", valorada " << resultadosFinales[i + fallos]._numVal << " veces. Valoracion media: " << resultadosFinales[i + fallos].getMean() << std::endl;
+		}
+	} else {
+		std::cout << "[Proceso " << _processId << "]: Realizando envio de datos al proceso principal..." << std::endl;
+		//Enviamos los resultados parciales al proceso principal, quien realizará la agregacion final y mostrara los resultados por pantalla.
+		MPI_Gather(resultadosParciales.data(), resultadosParciales.size() * sizeof(puntuacionFinal) / sizeof(int), MPI_INT, nullptr, 0, MPI_INT, 0, MPI_COMM_WORLD);
+	}
+	delete[] text;
+	MPI_File_close(&_dataFile);
+	MPI_Finalize(); //Finalizaci�n OpenMPI
+}
+
 int main(int argc, char* argv[]) {
-	Pr7(argc, argv);
+	Pr8(argc, argv);
 
 	return 0;
 }

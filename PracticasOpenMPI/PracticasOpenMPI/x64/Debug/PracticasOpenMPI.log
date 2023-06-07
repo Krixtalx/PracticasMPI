@@ -1,2 +1,9 @@
 ﻿  Main.cpp
+C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.34.31933\include\filesystem(13): warning STL4038: The contents of <filesystem> are available only with C++17 or later.
+C:\Github\PracticasMPI\PracticasOpenMPI\PracticasOpenMPI\Main.cpp(399,33): warning C4267: '=': conversión de 'size_t' a 'unsigned int'; posible pérdida de datos
+C:\Github\PracticasMPI\PracticasOpenMPI\PracticasOpenMPI\Main.cpp(410,65): warning C4267: '=': conversión de 'size_t' a 'unsigned int'; posible pérdida de datos
+C:\Github\PracticasMPI\PracticasOpenMPI\PracticasOpenMPI\Main.cpp(436,20): warning C4018: '<': no coinciden signed/unsigned
+C:\Github\PracticasMPI\PracticasOpenMPI\PracticasOpenMPI\Main.cpp(466,42): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+C:\Github\PracticasMPI\PracticasOpenMPI\PracticasOpenMPI\Main.cpp(480,219): warning C4267: 'argumento': conversión de 'size_t' a 'int'; posible pérdida de datos
+C:\Github\PracticasMPI\PracticasOpenMPI\PracticasOpenMPI\Main.cpp(517,157): warning C4267: 'argumento': conversión de 'size_t' a 'int'; posible pérdida de datos
   PracticasOpenMPI.vcxproj -> C:\Github\PracticasMPI\PracticasOpenMPI\x64\Debug\PracticasOpenMPI.exe
